@@ -1,5 +1,5 @@
 """
-Identifier:     csst_ifs_wcs/wcs_to_rss.py
+Identifier:     chili_wcs/wcs_to_rss.py
 Name:           wcs_to_rss.py
 Description:    Calculate WCS parameter and add it to rss header.
 Author:         Yifei Xiong

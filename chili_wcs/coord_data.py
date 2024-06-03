@@ -1,5 +1,5 @@
 """
-Identifier:     csst_ifs_wcs/coord_data.py
+Identifier:     chili_wcs/coord_data.py
 Name:           coord_data.py
 Description:    Class for Handling Coordinates data,pixel coordinates and sky coordinates.
 Author:         Yifei Xiong

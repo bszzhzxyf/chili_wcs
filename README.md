@@ -21,10 +21,20 @@ cd chili_wcs
 pip install .
 ```
 ## tutorial
-本代码可用于生成CHILI积分视场光谱仪的WCS数据,并添加到RSS的头文件中,使用方法如下:\
-This code is used to generate WCS parameters and add it into RSS header:
+1.本代码可用于生成CHILI积分视场光谱仪的WCS数据,并添加到RSS的头文件中
 
-本代码可用于IFS和其他图像的WCS参数定标，提供数据载入、星像定心、Gaia星表导入、三角匹配、像素到天球的WCS转换算法、参数解算等功能:\
+2.本代码可以给定IFU中心的RA、DEC和PA角预测导星相机的RA、DEC和PA角：
+```
+from chili_wcs.guider import guider_pointing
+
+ra_IFU =  111.11    # RA in degree
+dec_IFU = 22.22     # DEC in degree
+PA_IFU = 10         # PA in degree 
+
+ra0_guider, dec0_guider, PA_guider = guider_pointing(ra_IFU,dec_IFU,PA_IFU)  # unit: degree
+```
+
+3.本代码可用于IFS和其他图像的WCS参数定标，提供数据载入、星像定心、Gaia星表导入、三角匹配、像素到天球的WCS转换算法、参数解算等功能:\
 This code can also be used for WCS parameter calibration of IFS and other images, providing star image centering, Gaia catalog, Triange matching,WCS transform, Parameter fitting and other functions:
 ```
 from chili_wcs.load_data import LoadRSS  # 载入RSS模块

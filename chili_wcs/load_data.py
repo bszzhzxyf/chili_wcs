@@ -1,5 +1,5 @@
 """
-Identifier:     csst_ifs_wcs/load_data.py
+Identifier:     chili_wcs/load_data.py
 Name:           load_data.py
 Description:    Load RSS、FGS and relative WCS (IWCS) reference file data.
 Author:         Yifei Xiong

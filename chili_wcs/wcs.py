@@ -1,5 +1,5 @@
 """
-Identifier:     csst_ifs_wcs/wcs.py
+Identifier:     chili_wcs/wcs.py
 Name:           wcs.py
 Description:    WCS transform functions，calculate sky coordinates from pixels.
 Author:         Yifei Xiong

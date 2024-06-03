@@ -9,6 +9,7 @@ Modified-History:
     2024-6-2: debug
 """
 from .wcs import WCS
+import numpy as np
 
 def guider_pointing(ra_IFU,dec_IFU,PA_IFU):
     # relative paramter

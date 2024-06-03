@@ -8,7 +8,6 @@ Modified-History:
     2023-11-16:Create by Yifei Xiong
 """
 
-from .csst_ifs_l1_wcs import PipelineL1IFSWCS
 from .coord_data import CoordData
 from .fit_wcs import TriMatch, FitParam
 from .load_data import LoadRSS, LoadFGS, LoadIWCS
