@@ -55,14 +55,14 @@ trimatch = TriMatch(rss_xy, rss_radec)
 matches = trimatch.matches_array  
 
 # Fit parameter 解算WCS参数
-inipara = OrderedDict({"CRPIX": np.array([16.5, 16.5])})    
+fixedpara = OrderedDict({"CRPIX": np.array([16.5, 16.5])})    
 p0 = [0, 0, 0, 0, 0, 0]
 fit = FitParam(rss_xy,
                 rss_radec,
                 matches,
                 method="Normal",
-                inipara=inipara,
-                p0=p0)}
+                fixedpara=fixedpara,
+                inipara=p0)}
 print(fit.bestparam)
 print(fit.wcs_fitted)
 ```

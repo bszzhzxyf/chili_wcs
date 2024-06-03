@@ -187,9 +187,9 @@ class FitParam(WCS):
     method : str
         Transformation method. Options are "Normal" for Normal WCS transform,
         "MCI" for MCI WCS transform, and "IFS" for IFS WCS transform.
-    inipara : dict
+    fixedpara : dict
         Dictionary containing known parameters such as CRPIX.
-    p0 : array-like
+    inipara : array-like
         Initial guess for the transformation parameters.
 
     Attributes
@@ -202,9 +202,9 @@ class FitParam(WCS):
         Array containing matched triangles between pixel and celestial coordinates.
     method : str
         Transformation method.
-    inipara : dict
+    fixedpara : dict
         Dictionary containing known parameters such as CRPIX.
-    p0 : array-like
+    inipara : array-like
         Initial guess for the transformation parameters.
     bestparam : array-like
         Best-fit WCS parameters.
@@ -231,7 +231,7 @@ class FitParam(WCS):
         pixel and celestial coordinates.
     """
 
-    def __init__(self, pixel: np.ndarray, radec: np.ndarray, matches: np.ndarray, method: str, inipara: dict, p0: np.ndarray):
+    def __init__(self, pixel: np.ndarray, radec: np.ndarray, matches: np.ndarray, method: str, fixedpara: dict, inipara: np.ndarray):
         """
         method="Normal":Normal WCS transform
               ="MCI"   :MCI WCS transform
@@ -243,8 +243,8 @@ class FitParam(WCS):
         self.radec = radec
         self.matches_array = matches
         self.method = method
+        self.fixedpara = fixedpara
         self.inipara = inipara
-        self.p0 = p0
         self.bestparam, self.coords = self.find_bestparam(pixel, radec, matches)
 
         if self.method == "Normal":
@@ -276,22 +276,22 @@ class FitParam(WCS):
         # params:crval1,crval2,cd11,cd12,cd21,cd22
         # Predict Value
         if self.method == "Normal":
-            self.CRPIX = self.inipara["CRPIX"]
+            self.CRPIX = self.fixedpara["CRPIX"]
             self.CRVAL = np.array([params[0], params[1]])
             self.CD = np.matrix([[params[2], params[3]],
                                  [params[4], params[5]]])
             ra_c, dec_c = self.xy2sky(xy).T
         if self.method == "MCI":
-            self.MCRPIX = self.inipara["MCRPIX"]
+            self.MCRPIX = self.fixedpara["MCRPIX"]
             self.MCRVAL = np.array([params[0], params[1]])
             self.MCD = np.matrix([[params[2], 0], [0, params[3]]])
             self.MLONPOLE = params[4]
             ra_c, dec_c = self.mci_xy2sky(xy).T
         if self.method == "IFS":
             # params:crval1,crval2,cd11,cd12,cd21,cd22
-            self.ICRPIX = self.inipara["ICRPIX"]
-            self.MCRVAL = self.inipara["MCRVAL"]
-            self.MLONPOLE = self.inipara["MLONPOLE"]
+            self.ICRPIX = self.fixedpara["ICRPIX"]
+            self.MCRVAL = self.fixedpara["MCRVAL"]
+            self.MLONPOLE = self.fixedpara["MLONPOLE"]
             self.ICRVAL = np.array([params[0], params[1]])
             self.ICD = np.matrix([[params[2], 0], [0, params[3]]])
             self.ILONPOLE = params[4]
@@ -314,7 +314,7 @@ class FitParam(WCS):
 
     def fit_wcs(self, xy, radec):
         fit = least_squares(self.fit_resids,
-                            self.p0,
+                            self.inipara,
                             method="lm",
                             args=(xy, radec))
         return fit.x
