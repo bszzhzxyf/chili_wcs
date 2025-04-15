@@ -6,4 +6,5 @@ setuptools~68.2.2
 astropy~6.0.0
 astroquery~0.4.6
 sep~1.2.1
+scikit-learn~1.0.2
 # photutils==1.5.0

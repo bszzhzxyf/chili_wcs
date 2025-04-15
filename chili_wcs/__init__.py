@@ -10,10 +10,10 @@ Modified-History:
 
 from .coord_data import CoordData
 from .fit_wcs import TriMatch, FitParam
-from .load_data import LoadRSS, LoadFGS, LoadIWCS
-from .wcs_to_rss import wcs_to_rss_FGS, fake_wcs
+from .load_data import LoadRSS, LoadGuider, LoadIWCS
+from .wcs_to_rss import  fake_wcs, wcs_to_rss_Guider
 from .wcs import WCS
 
 
 __version__ = "0.0.1 dev"
-__all__ = ["PipelineL1IFSWCS", "CoordData", "TriMatch", "FitParam", "LoadRSS", "LoadFGS", "LoadIWCS", "WCS", "fake_wcs", "wcs_to_rss_FGS"]
+__all__ = ["PipelineL1IFSWCS", "CoordData", "TriMatch", "FitParam", "LoadRSS", "LoadGuider", "LoadIWCS", "WCS", "fake_wcs", "wcs_to_rss_Guider"]

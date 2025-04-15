@@ -21,48 +21,19 @@ cd chili_wcs
 pip install .
 ```
 ## tutorial
-1.本代码可用于生成CHILI积分视场光谱仪的WCS数据,并添加到RSS的头文件中
+Chili 是位于云南丽江的2.4m望远镜上的积分视场光谱仪，本代码是为了给该仪器进行天体测量WCS定标而生的。
+代码主要能解决以下几个问题:
+1.相对位置定标：通过观测密集星场，可以标定IFU和Chili导星以及耐焦导星相机之间的相对位置关系。
+2.观测计划: 给定IFU中心指向RA和DEC以及PA角，预测chili导星和耐焦导星相机的指向和PA 以及生成参考天图。
+3.WCS定标: 给定IFU科学观测时导星相机拍摄的图像，反推出IFU的WCS参数以及每根光纤对应的RA、DEC
 
-2.本代码可以给定IFU中心的RA、DEC和PA角预测导星相机的RA、DEC和PA角：
-```
-from chili_wcs.guider import guider_pointing
+为实现上述功能，代码主要具有星像质心定位、星像和星表配准、WCS参数解算等功能(以后再补充文档)。
 
-ra_IFU =  111.11    # RA in degree
-dec_IFU = 22.22     # DEC in degree
-PA_IFU = 10         # PA in degree 
+快速入门可以参考，在/chili_wcs/example 文件中提供了两个使用的例子
 
-ra0_guider, dec0_guider, PA_guider = guider_pointing(ra_IFU,dec_IFU,PA_IFU)  # unit: degree
-```
+其中WCS_calibration_20250415.ipynb里介绍了如何使用本程序标定IFU和导星相机之间的相对位置关系，以及观测后如何利用导星相机的图像预测IFU的WCS参数和每个Fiber在天球坐标系下的位置, /chili_wcs/example/calibration_data里保存了用于定标的数据，为kopff27标准星，/chili_wcs/example/example_data/results/IWCS_20250415.fits 文件里保存了导星和IFU之间的相对位置关系参数，可用来对不同仪器之间的WCS参数进行转换。
 
-3.本代码可用于IFS和其他图像的WCS参数定标，提供数据载入、星像定心、Gaia星表导入、三角匹配、像素到天球的WCS转换算法、参数解算等功能:\
-This code can also be used for WCS parameter calibration of IFS and other images, providing star image centering, Gaia catalog, Triange matching,WCS transform, Parameter fitting and other functions:
-```
-from chili_wcs.load_data import LoadRSS  # 载入RSS模块
-from chili_wcs.coord_data import CoordData  # 星点像素坐标与天球坐标
-from chili_wcs.fit_wcs import TriMatch, FitParam  # 三角匹配, 参数拟合
-from chili_wcs.wcs import WCS  # WCS底片模型
+而/chili_wcs/example/Chili_Plan_Tool.ipynb 给出了如何利用本代码，给定IFU的中心指向和PA角，结合相对位置关系参数，预测导星相机的指向，并给出预测的天区图，预测结果在/chili_wcs/example/plantoolresults中查看，可以作为观测时的参考图像。
 
-path = "./rss.fits"
-rss = LoadRSS(path, path_filter=None)
-
-# Coordinate Datas  用于拟合的输入输出坐标数据准备
-rss_coord = CoordData(rss, rad=6., radec_point=[ra0, dec0])
-rss_xy = rss_coord.xy  # pixel_coordinates
-rss_radec = rss_coord.radec # ra dec data
-
-# Triange matching  三角匹配像素坐标和天球坐标
-trimatch = TriMatch(rss_xy, rss_radec)
-matches = trimatch.matches_array  
-
-# Fit parameter 解算WCS参数
-fixedpara = OrderedDict({"CRPIX": np.array([16.5, 16.5])})    
-p0 = [0, 0, 0, 0, 0, 0]
-fit = FitParam(rss_xy,
-                rss_radec,
-                matches,
-                method="Normal",
-                fixedpara=fixedpara,
-                inipara=p0)}
-print(fit.bestparam)
-print(fit.wcs_fitted)
-```
+下图展示了使用 Chili_Plan_Tool 生成的预测天区图示例，显示了 IFU、导星相机和耐焦导星相机的视场：
+![Chili天区预测图](chili_wcs/example/plantoolresults/M1/ChiliSky.jpg)

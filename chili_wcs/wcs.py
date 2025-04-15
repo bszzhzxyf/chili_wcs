@@ -17,7 +17,7 @@ class WCS():
     A class for World Coordinate System (WCS) transformations.
 
     This class handles the transformation between pixel coordinates and celestial coordinates
-    using different WCS parameters for standard WCS, MCI ,and IFS.
+    using different WCS parameters for standard WCS, Guider ,and IFS.
 
     Parameters
     ----------
@@ -25,8 +25,8 @@ class WCS():
         Fits Headers that include WCS parameters.
     wcspara : collection.dict, optional
         Standard WCS parameters.
-    mwcspara : collection.dict, optional
-        MCI_WCS parameters.
+    gwcspara : collection.dict, optional
+        Guider_WCS parameters.
     iwcspara : collection.dict, optional
         IFS_WCS parameters.
     pywcs : astropy.WCS, optional
@@ -41,13 +41,13 @@ class WCS():
     CRVAL : np.ndarray
         Celestial coordinates of the reference point.
 
-    MCRPIX : np.ndarray
-        Pixel coordinates of the MCI reference point.
-    MCD : np.ndarray
-        Coordinate transformation matrix for MCI.
-    MCRVAL : np.ndarray
-        Celestial coordinates of the MCI reference point.
-    MLONPOLE : float
+    GCRPIX : np.ndarray
+        Pixel coordinates of the Guider reference point.
+    GCD : np.ndarray
+        Coordinate transformation matrix for Guider.
+    GCRVAL : np.ndarray
+        Celestial coordinates of the Guider reference point.
+    GLONPOLE : float
         Longitude of the celestial pole.
 
     ICRPIX : np.ndarray
@@ -63,8 +63,8 @@ class WCS():
     -------
     xy2sky(xy)
         Transform pixel coordinates to celestial coordinates for standard WCS.
-    mci_xy2sky(xy)
-        Transform pixel coordinates to celestial coordinates for MCI.
+    guider_xy2sky(xy)
+        Transform pixel coordinates to celestial coordinates for Guider.
     ifs_xy2sky(xy)
         Transform pixel coordinates to celestial coordinates for IFS.
     """
@@ -72,7 +72,7 @@ class WCS():
     def __init__(self,
                  header: dict = None,
                  wcspara: dict = None,
-                 mwcspara: dict = None,
+                 gwcspara: dict = None,
                  iwcspara: dict = None,
                  pywcs: type(aWCS()) = None):
 
@@ -80,10 +80,10 @@ class WCS():
         self.CD = np.array([[0, 0], [0, 0]])
         self.CRVAL = np.array([0, 0])
 
-        self.MCRPIX = np.array([0, 0])
-        self.MCD = np.array([[0, 0], [0, 0]])
-        self.MCRVAL = np.array([0, 0])
-        self.MLONPOLE = 0
+        self.GCRPIX = np.array([0, 0])
+        self.GCD = np.array([[0, 0], [0, 0]])
+        self.GCRVAL = np.array([0, 0])
+        self.GLONPOLE = 0
 
         self.ICRPIX = np.array([0, 0])
         self.ICD = np.array([[0, 0], [0, 0]])
@@ -109,15 +109,15 @@ class WCS():
             self.CRVAL = np.array(
                 [self.wcspara['CRVAL1'], self.wcspara['CRVAL2']])
             # self.LONPOLE = self.param['LONPOLE']
-        if mwcspara is not None:
-            self.mwcspara = mwcspara
-            self.MCRPIX = np.array(
-                [self.mwcspara['MCRPIX1'], self.mwcspara['MCRPIX2']])
-            self.MCD = np.array([[self.mwcspara['MCD1_1'], 0],
-                                 [0, self.mwcspara['MCD2_2']]])
-            self.MCRVAL = np.array(
-                [self.mwcspara['MCRVAL1'], self.mwcspara['MCRVAL2']])
-            self.MLONPOLE = self.mwcspara['MLONPOLE']
+        if gwcspara is not None:
+            self.gwcspara = gwcspara
+            self.GCRPIX = np.array(
+                [self.gwcspara['GCRPIX1'], self.gwcspara['GCRPIX2']])
+            self.GCD = np.array([[self.gwcspara['GCD1_1'], 0],
+                                 [0, self.gwcspara['GCD2_2']]])
+            self.GCRVAL = np.array(
+                [self.gwcspara['GCRVAL1'], self.gwcspara['GCRVAL2']])
+            self.GLONPOLE = self.gwcspara['GLONPOLE']
         if iwcspara is not None:
             self.iwcspara = iwcspara
             self.ICRPIX = np.array(
@@ -182,12 +182,16 @@ class WCS():
             if r == 0:
                 phi[i] = 0
                 theta[i] = np.pi / 2
+        phi = np.rad2deg(phi)
+        theta = np.rad2deg(theta)
         return phi, theta
 
     # Step4
     @staticmethod
     def sphere_rotate(phi, theta, ra0, dec0, phi_p):
         # Step 4
+        phi = np.deg2rad(phi)
+        theta = np.deg2rad(theta)
         phi_p = np.deg2rad(phi_p)
         dec0 = np.deg2rad(dec0)
         t = np.arctan2(
@@ -195,10 +199,15 @@ class WCS():
             np.sin(theta) * np.cos(dec0) -
             np.cos(theta) * np.sin(dec0) * np.cos(phi - phi_p))
         ra = ra0 + np.degrees(t)
+        ra = ra % 360
         dec = np.degrees(
             np.arcsin(
                 np.sin(theta) * np.sin(dec0) +
                 np.cos(theta) * np.cos(dec0) * np.cos(phi - phi_p)))
+        dec = np.where(dec > 90, 180 - dec, dec)
+        ra = np.where(dec > 90, (ra + 180) % 360, ra)
+        dec = np.where(dec < -90, -180 - dec, dec)
+        ra = np.where(dec < -90, (ra + 180) % 360, ra)
         return ra, dec
 
     # Normal Method
@@ -223,38 +232,37 @@ class WCS():
         radec = WCS.wcs_transform(x, y, x0, y0, CD, ra0, dec0, phi_p)
         return radec
 
-    # MCI transform
+    # Guider transform
     @staticmethod
-    def mci_transform(mx, my, mx0, my0, mCD, mra0, mdec0, mphi_p):
-        u, v = WCS.pix2cpix(mx, my, mx0, my0)
-        proj = WCS.cpix2proj(u, v, mCD)
+    def guider_transform(gx, gy, gx0, gy0, gCD, gra0, gdec0, gphi_p):
+        u, v = WCS.pix2cpix(gx, gy, gx0, gy0)
+        proj = WCS.cpix2proj(u, v, gCD)
         phi, theta = WCS.proj2sphere(proj)
-        ra, dec = WCS.sphere_rotate(phi, theta, mra0, mdec0, mphi_p)
+        ra, dec = WCS.sphere_rotate(phi, theta, gra0, gdec0, gphi_p)
         radec = np.column_stack([ra, dec])  # two column array
         return radec
 
-    def mci_xy2sky(self, xy):
+    def guider_xy2sky(self, xy):
         # input pixel xy
         x, y = xy.T
         # parameter
-        mx0, my0 = self.MCRPIX
-        mra0, mdec0 = self.MCRVAL
-        mCD = self.MCD
-        mphi_p = self.MLONPOLE
+        gx0, gy0 = self.GCRPIX
+        gra0, gdec0 = self.GCRVAL
+        gCD = self.GCD
+        gphi_p = self.GLONPOLE
         # transform
-        radec = WCS.mci_transform(x, y, mx0, my0, mCD, mra0, mdec0, mphi_p)
+        radec = WCS.guider_transform(x, y, gx0, gy0, gCD, gra0, gdec0, gphi_p)
         return radec
 
     # IFS transform
     @staticmethod
-    def ifs_transform(x, y, mra0, mdec0, mphi_p, ix0, iy0, iCD, icv1, icv2,
+    def ifs_transform(x, y, gra0, gdec0, gphi_p, ix0, iy0, iCD, icv1, icv2,
                       iphi_p):
         iu, iv = WCS.pix2cpix(x, y, ix0, iy0)
         iproj = WCS.cpix2proj(iu, iv, iCD)
         iphi, itheta = WCS.proj2sphere(iproj)
         phi, theta = WCS.sphere_rotate(iphi, itheta, icv1, icv2, iphi_p)
-        phi, theta = np.deg2rad(phi), np.deg2rad(theta)
-        ra, dec = WCS.sphere_rotate(phi, theta, mra0, mdec0, mphi_p)
+        ra, dec = WCS.sphere_rotate(phi, theta, gra0, gdec0, gphi_p)
         radec = np.column_stack([ra, dec])  # two column array
         return radec
 
@@ -262,9 +270,9 @@ class WCS():
         # input pixel xy
         x, y = xy.T
         # parameter
-        # MCI
-        mra0, mdec0 = self.MCRVAL
-        mphi_p = self.MLONPOLE
+        # Guider
+        gra0, gdec0 = self.GCRVAL
+        gphi_p = self.GLONPOLE
         # IFS
         ix0, iy0 = self.ICRPIX
         icv1, icv2 = self.ICRVAL
@@ -272,6 +280,6 @@ class WCS():
         iphi_p = self.ILONPOLE
         ###################
         # transform
-        radec = WCS.ifs_transform(x, y, mra0, mdec0, mphi_p, ix0, iy0, iCD,
+        radec = WCS.ifs_transform(x, y, gra0, gdec0, gphi_p, ix0, iy0, iCD,
                                   icv1, icv2, iphi_p)
         return radec

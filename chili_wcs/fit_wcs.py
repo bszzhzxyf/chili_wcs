@@ -54,9 +54,10 @@ class TriMatch():
     matching(pixel, radec)
         Perform triangle matching between pixel and celestial coordinate sets.
     """
-    def __init__(self, pixel: np.ndarray, radec: np.ndarray):
+    def __init__(self, pixel: np.ndarray, radec: np.ndarray, match_radius=0.05):
         self.pixel = pixel
         self.radec = radec
+        self.match_radius=match_radius
         self.matches_array = self.matching(pixel, radec)
 
     def invariants(self, x1, x2, x3, sky=False):
@@ -161,7 +162,7 @@ class TriMatch():
             radec_controlp, sky=True)
         radec_invariant_tree = KDTree(radec_invariants)
         matches_list = pixel_invariant_tree.query_ball_tree(
-            radec_invariant_tree, r=0.05)
+            radec_invariant_tree, r=self.match_radius)
         matches = []
         for t1, t2_list in zip(pixel_asterisms, matches_list):
             for t2 in radec_asterisms[t2_list]:
@@ -186,7 +187,7 @@ class FitParam(WCS):
         Array containing matched triangles between pixel and celestial coordinates.
     method : str
         Transformation method. Options are "Normal" for Normal WCS transform,
-        "MCI" for MCI WCS transform, and "IFS" for IFS WCS transform.
+        "Guider" for Guider WCS transform, and "IFU" for IFU WCS transform.
     fixedpara : dict
         Dictionary containing known parameters such as CRPIX.
     inipara : array-like
@@ -231,13 +232,7 @@ class FitParam(WCS):
         pixel and celestial coordinates.
     """
 
-    def __init__(self, pixel: np.ndarray, radec: np.ndarray, matches: np.ndarray, method: str, fixedpara: dict, inipara: np.ndarray):
-        """
-        method="Normal":Normal WCS transform
-              ="MCI"   :MCI WCS transform
-              ="IFS"   :IFS WCS transform
-        inipara:dict,some known parameter such as crpix
-        """
+    def __init__(self, pixel: np.ndarray, radec: np.ndarray, matches: np.ndarray, method: str, fixedpara: dict, inipara: np.ndarray, target_err: float = 0.5 , min_data_points = 3):
         super().__init__()
         self.pixel = pixel
         self.radec = radec
@@ -245,6 +240,22 @@ class FitParam(WCS):
         self.method = method
         self.fixedpara = fixedpara
         self.inipara = inipara
+        if self.method == "Normal":
+            lower_bounds = np.array([0, 0, -1, -1, -1, -1])
+            upper_bounds = np.array([360, 90, 1, 1, 1, 1])
+            self.bounds = (lower_bounds, upper_bounds)
+        if self.method == "Guider":
+            lower_bounds = np.array([0, 0, -1, 0, 0])
+            upper_bounds = np.array([360, 90, 0, 1, 360])
+            self.bounds = (lower_bounds, upper_bounds)
+        elif self.method == "IFU":
+            lower_bounds = np.array([0, 0, -1, 0, 0])
+            upper_bounds = np.array([360, 90, 0, 1, 360])
+            self.bounds = (lower_bounds, upper_bounds)
+        self.target_err = target_err  
+        self.min_data_points = min_data_points
+          
+
         self.bestparam, self.coords = self.find_bestparam(pixel, radec, matches)
 
         if self.method == "Normal":
@@ -261,12 +272,12 @@ class FitParam(WCS):
             w.wcs.pc[1, 1] = self.wcs_fitted['CD2_2']
             w.wcs.ctype = ["RA---TAN", "DEC--TAN"]
             self.awcs = w
-        if self.method == "MCI":
-            self.mwcs_fitted = OrderedDict({"MCRPIX1": self.MCRPIX[0], "MCRPIX2": self.MCRPIX[1],
-                                            "MCRVAL1": self.bestparam[0], "MCRVAL2": self.bestparam[1],
-                                            "MCD1_1": self.bestparam[2], "MCD2_2": self.bestparam[3],
-                                            "MLONPOLE": self.bestparam[4]})
-        if self.method == "IFS":
+        if self.method == "Guider":
+            self.gwcs_fitted = OrderedDict({"GCRPIX1": self.GCRPIX[0], "GCRPIX2": self.GCRPIX[1],
+                                            "GCRVAL1": self.bestparam[0], "GCRVAL2": self.bestparam[1],
+                                            "GCD1_1": self.bestparam[2], "GCD2_2": self.bestparam[3],
+                                            "GLONPOLE": self.bestparam[4]})
+        if self.method == "IFU":
             self.iwcs_fitted = OrderedDict({"ICRPIX1": self.ICRPIX[0], "ICRPIX2": self.ICRPIX[1],
                                             "ICRVAL1": self.bestparam[0], "ICRVAL2": self.bestparam[1],
                                             "ICD1_1": self.bestparam[2], "ICD2_2": self.bestparam[3],
@@ -281,17 +292,18 @@ class FitParam(WCS):
             self.CD = np.matrix([[params[2], params[3]],
                                  [params[4], params[5]]])
             ra_c, dec_c = self.xy2sky(xy).T
-        if self.method == "MCI":
-            self.MCRPIX = self.fixedpara["MCRPIX"]
-            self.MCRVAL = np.array([params[0], params[1]])
-            self.MCD = np.matrix([[params[2], 0], [0, params[3]]])
-            self.MLONPOLE = params[4]
-            ra_c, dec_c = self.mci_xy2sky(xy).T
-        if self.method == "IFS":
-            # params:crval1,crval2,cd11,cd12,cd21,cd22
+        if self.method == "Guider":
+            self.GCRPIX = self.fixedpara["GCRPIX"]
+            self.GCRVAL = np.array([params[0], params[1]])
+            self.GCD = np.matrix([[params[2], 0], [0, params[3]]])
+            self.GLONPOLE = params[4]
+            ra_c, dec_c = self.guider_xy2sky(xy).T
+
+        elif self.method == "IFU":
+            # params:icrval1,icrval2,icd11,icd22,ilonpole
             self.ICRPIX = self.fixedpara["ICRPIX"]
-            self.MCRVAL = self.fixedpara["MCRVAL"]
-            self.MLONPOLE = self.fixedpara["MLONPOLE"]
+            self.GCRVAL = self.fixedpara["GCRVAL"]
+            self.GLONPOLE = self.fixedpara["GLONPOLE"]
             self.ICRVAL = np.array([params[0], params[1]])
             self.ICD = np.matrix([[params[2], 0], [0, params[3]]])
             self.ILONPOLE = params[4]
@@ -315,8 +327,9 @@ class FitParam(WCS):
     def fit_wcs(self, xy, radec):
         fit = least_squares(self.fit_resids,
                             self.inipara,
-                            method="lm",
-                            args=(xy, radec))
+                            method="trf",
+                            args=(xy, radec),
+                            bounds=self.bounds)
         return fit.x
 
     def fit(self, matches):
@@ -333,24 +346,26 @@ class FitParam(WCS):
         error = np.sqrt(ra_resid**2 + dec_resid**2).reshape(d1, d2).max(axis=1)
         return error
 
-    def ransac(self, data, min_data_points, max_iter, thresh, min_matches):
-        """fit model parameters to data using the RANSAC algorithm
+    def ransac(self, data, min_data_points, max_iter):
+        """
+        Fit model parameters to data using the RANSAC algorithm.
 
-        This implementation written from pseudocode found at
-        http://en.wikipedia.org/w/index.php?title=RANSAC&oldid=116358182
+        Parameters
+        ----------
+        data : array-like
+            A set of data points.
+        min_data_points : int
+            The minimum number of data values required to fit the model.
+        max_iter : int
+            The maximum number of iterations allowed in the algorithm.
 
-        Given:
-            data: a set of data points
-            model: a model that can be fitted to data points
-            min_data_points: the minimum number of data values required to fit the
-                model
-            max_iter: the maximum number of iterations allowed in the algorithm
-            thresh: a threshold value to determine when a data point fits a model
-            min_matches: the min number of matches required to assert that a model
-                fits well to data
-        Return:
-            bestfit: model parameters which best fit the data (or nil if no good
-                      model is found)"""
+        Returns
+        -------
+        bestfit : array-like or None
+            Model parameters which best fit the data (or None if no good model is found).
+        best_inlier_idxs : array-like
+            Indices of the best inliers.
+        """
         iterations = 0
         bestfit = None
         best_err = 1000000
@@ -359,33 +374,27 @@ class FitParam(WCS):
         n_data = data.shape[0]
         n = min_data_points
         all_idxs = np.arange(n_data)
-        while (best_err > 0.2) or (iterations < max_iter):
+        thresh = self.target_err / 2
+        while (best_err > self.target_err) or (iterations < max_iter):
             # Partition indices into two random subsets
             np.random.shuffle(all_idxs)
             maybe_idxs, test_idxs = all_idxs[:n], all_idxs[n:]
             maybeinliers = data[maybe_idxs, :]
             test_points = data[test_idxs, :]
             maybemodel = self.fit(maybeinliers)
-            # print("maybemodel:{}".format(maybemodel))
             test_err = self.get_error(test_points, maybemodel)
-            # print("test_error:{}".format(test_err))
-            # select indices of rows with accepted points
+            # Select indices of rows with accepted points
             also_idxs = test_idxs[test_err < thresh]
             alsoinliers = data[also_idxs, :]
-            # print("alsoinliers:{}".format(alsoinliers))
             num_inliers = len(maybeinliers) + len(alsoinliers)
             if num_inliers >= best_matches:
                 best_matches = num_inliers
-                # print("best_matches:{}".format(best_matches))
                 betterdata = np.concatenate((maybeinliers, alsoinliers))
                 better_inlier_idxs = np.concatenate((maybe_idxs, also_idxs))
                 bettermodel = self.fit(betterdata)
-                # print("bettermodel:{}".format(bettermodel))
-                # best number of matches
+                # Best number of matches
                 better_errs = self.get_error(betterdata, bettermodel)
-                # print("better_errors:{}".format(better_errs))
                 better_err = np.max(better_errs)
-                # print("better_error:{}".format(better_err))
                 if better_err < best_err:
                     best_err = better_err
                     print("best_error:{}".format(best_err))
@@ -407,26 +416,22 @@ class FitParam(WCS):
         else:
             # RANSAC parameter
             # min_data_points, max_iter, thresh, min_matches
-            min_data_points = 3  # param 1
+              # param 1 , 
             max_iter = n_invariants * 3  # param 2
-            thresh = 0.05
-            MIN_MATCHES_FRACTION = 0.5
-            min_matches = max(
-                1, min(10, int(n_invariants * MIN_MATCHES_FRACTION)))
-            best_t, inlier_ind = self.ransac(matches, min_data_points,
-                                             max_iter, thresh, min_matches)
+            best_t, inlier_ind = self.ransac(matches, self.min_data_points,
+                                             max_iter)
         if best_t is not None:
             if self.method == "Normal":
                 self.CRVAL = np.array([best_t[0], best_t[1]])
                 self.CD = np.matrix([[best_t[2], best_t[3]],
                                      [best_t[4], best_t[5]]])
                 self.trans_func = self.xy2sky
-            if self.method == "MCI":
-                self.MCRVAL = np.array([best_t[0], best_t[1]])
-                self.MCD = np.matrix([[best_t[2], 0], [0, best_t[3]]])
-                self.MLONPOLE = best_t[4]
-                self.trans_func = self.mci_xy2sky
-            if self.method == "IFS":
+            if self.method == "Guider":
+                self.GCRVAL = np.array([best_t[0], best_t[1]])
+                self.GCD = np.matrix([[best_t[2], 0], [0, best_t[3]]])
+                self.GLONPOLE = best_t[4]
+                self.trans_func = self.guider_xy2sky
+            if self.method == "IFU":
                 # params:crval1,crval2,cd11,cd12,cd21,cd22
                 self.ICRVAL = np.array([best_t[0], best_t[1]])
                 self.ICD = np.matrix([[best_t[2], 0], [0, best_t[3]]])

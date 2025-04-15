@@ -11,11 +11,11 @@ Modified-History:
 
 import numpy as np
 from collections import OrderedDict
-from .load_data import LoadRSS, LoadFGS, LoadIWCS
+from .load_data import LoadRSS, LoadGuider, LoadIWCS
 from .wcs import WCS
 
 
-def wcs_to_rss_FGS(path_ifs_rss: str, path_guider_img: str, path_iwcs_ref: str, output_path: str):
+def wcs_to_rss_Guider(path_ifs_rss: str, path_guider_img: str, path_iwcs_ref: str, output_path: str):
     """
     Generate inferred wcs.
 
@@ -44,7 +44,7 @@ def wcs_to_rss_FGS(path_ifs_rss: str, path_guider_img: str, path_iwcs_ref: str, 
         WCS parameter for RSS.
     """
     try:
-        guider = LoadFGS(path_guider_img)
+        guider = LoadGuider(path_guider_img)
         iwcs = LoadIWCS(path_iwcs_ref)
         rss = LoadRSS(path_ifs_rss)
     except:
@@ -52,15 +52,15 @@ def wcs_to_rss_FGS(path_ifs_rss: str, path_guider_img: str, path_iwcs_ref: str, 
         out_name = None
         wcs_para = None
         return exit_code, out_name, wcs_para
-    mwcspara = guider.mwcspara
+    gwcspara = guider.gwcspara
     iwcspara = iwcs.iwcspara
-    mi_wcs = WCS(mwcspara=mwcspara, iwcspara=iwcspara)
+    mi_wcs = WCS(gwcspara=gwcspara, iwcspara=iwcspara)
     x0_y0_i = np.array([[iwcspara["ICRPIX1"] - 1, iwcspara["ICRPIX2"] - 1]])
     ra0_i, dec0_i = mi_wcs.ifs_xy2sky(x0_y0_i)[0]  # CRVAL1/2 of IFS
     # calculate polar longitude in IFS native coordinates
     # input
-    lon_pole_m = np.deg2rad(mwcspara["MLONPOLE"])  # polar longitude in MCI
-    lat_pole_m = np.deg2rad(mwcspara["MCRVAL2"])  # polar latitude in MCI
+    lon_pole_m = np.deg2rad(gwcspara["GLONPOLE"])  # polar longitude in MCI
+    lat_pole_m = np.deg2rad(gwcspara["GCRVAL2"])  # polar latitude in MCI
     # Parameter
     lon_mci_i = iwcspara["ILONPOLE"]  # MCI longitude in IFS
     lat_mci_i = iwcspara["ICRVAL2"]  # MCI latitude in IFS
