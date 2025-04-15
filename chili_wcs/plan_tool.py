@@ -121,14 +121,13 @@ class ChiliPlanTool:
         
         # Format coordinate display
         self.ifu_coord = SkyCoord(ra=self.ra_IFU*u.deg, dec=self.dec_IFU*u.deg, frame='icrs')
-        self.ra_dec_IFU_text = f"IFU Center: RA={self.ifu_coord.ra.to_string(unit=u.hourangle, sep=':', precision=2)}, DEC={self.ifu_coord.dec.to_string(unit=u.deg, sep=':', precision=2)}"
+        self.ra_dec_IFU_text = f"IFU Center: RA={self.ifu_coord.ra.to_string(unit=u.hourangle, sep=':', precision=2)}, DEC={self.ifu_coord.dec.to_string(unit=u.deg, sep=':', precision=2)}, PA={self.PA_IFU:.2f}°"
         
         self.guider_coord = SkyCoord(ra=self.guider_ra*u.deg, dec=self.guider_dec*u.deg, frame='icrs')
-        self.ra_dec_Guider_text = f"Guider Center: RA={self.guider_coord.ra.to_string(unit=u.hourangle, sep=':', precision=2)}, DEC={self.guider_coord.dec.to_string(unit=u.deg, sep=':', precision=2)}"
+        self.ra_dec_Guider_text = f"Guider Center: RA={self.guider_coord.ra.to_string(unit=u.hourangle, sep=':', precision=2)}, DEC={self.guider_coord.dec.to_string(unit=u.deg, sep=':', precision=2)}, PA={self.guider_PA:.2f}°"
         
         self.nasmyth_coord = SkyCoord(ra=self.nasmyth_ra*u.deg, dec=self.nasmyth_dec*u.deg, frame='icrs')
-        self.ra_dec_Nasmyth_text = f"Nasmyth Guider Center: RA={self.nasmyth_coord.ra.to_string(unit=u.hourangle, sep=':', precision=2)}, DEC={self.nasmyth_coord.dec.to_string(unit=u.deg, sep=':', precision=2)}"
-    
+        self.ra_dec_Nasmyth_text = f"Nasmyth Guider Center: RA={self.nasmyth_coord.ra.to_string(unit=u.hourangle, sep=':', precision=2)}, DEC={self.nasmyth_coord.dec.to_string(unit=u.deg, sep=':', precision=2)}, PA={self.nasmyth_PA:.2f}°"
     def _calculate_pointing(self, ICRVAL1, ICRVAL2, ILONPOLE):
         """
         Calculate pointing and PA angle for guider camera
