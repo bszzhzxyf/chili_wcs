@@ -39,4 +39,4 @@ Chili 是位于云南丽江的2.4m望远镜上的积分视场光谱仪，本代�
 预测结果在/chili_wcs/example/plantoolresults中查看，可以作为观测时的参考图像。
 
 下图展示了使用 Chili_Plan_Tool 生成的预测天区图示例，显示了 IFU、导星相机和耐焦导星相机的视场：  
-![Chili天区预测图](../../example/plantoolresults/M1/ChiliSky.jpg)
+![Chili天区预测图](https://github.com/bszzhzxyf/chili_wcs/blob/main/example/plantoolresults/M1/ChiliSky.jpg)
