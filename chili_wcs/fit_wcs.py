@@ -1,5 +1,5 @@
 """
-Identifier:     csst_ifs_wcs/fit_wcs.py
+Identifier:     chili_wcs/fit_wcs.py
 Name:           fit_wcs.py
 Description:    Triangle matching coordinates and WCS Parameter Fitting.
 Author:         Yifei Xiong
@@ -249,7 +249,7 @@ class FitParam(WCS):
             upper_bounds = np.array([360, 90, 0, 1, 360])
             self.bounds = (lower_bounds, upper_bounds)
         elif self.method == "IFU":
-            lower_bounds = np.array([0, 0, -1, 0, 0])
+            lower_bounds = np.array([0,   0, -1, 0,  0])
             upper_bounds = np.array([360, 90, 0, 1, 360])
             self.bounds = (lower_bounds, upper_bounds)
         self.target_err = target_err  

@@ -4,6 +4,9 @@ Name:           wcs_solver.py
 Description:    Solve the wcs from the image and save the fits file.
 Author:         Yifei Xiong
 Created:        2024-11-21
+Last Modified:  2025-04-17
+Modified-History:
+    2025-04-17:  change the algorithm of IFU WCS solver.
 """
 import numpy as np
 from collections import OrderedDict
@@ -11,6 +14,8 @@ from .load_data import LoadRSS,LoadGuider,LoadIWCS  # Load RSS module
 from .coord_data import CoordData  # Star pixel coordinates and celestial coordinates
 from .fit_wcs import TriMatch, FitParam  # Triangle matching and parameter fitting
 from .wcs import WCS  # WCS plate model
+from astropy.coordinates import SkyCoord
+import astropy.units as u
 import matplotlib.pyplot as plt
 
 class WCSSolver:
@@ -238,7 +243,7 @@ class WCSSolver:
         
         # 2-4: WCS fitting:
         print("2-4: Intermediate WCS fitting")
-        ifixedpara = OrderedDict({"ICRPIX":np.array([0,0]),
+        ifixedpara = OrderedDict({"ICRPIX":np.array([1,1]),
                                 "GCRVAL":np.array([gwcs_fitted["GCRVAL1"],gwcs_fitted["GCRVAL2"]]),
                                 "GLONPOLE":gwcs_fitted["GLONPOLE"]}) # fixed parameters
         
@@ -246,7 +251,7 @@ class WCSSolver:
         if mode.lower() == "nasmyth":
             ip0 = [305.4, 89.787, 0, 0, 144.6]  # nasmyth模式的初始参数
         else:  # 默认为guider模式
-            ip0 = [0, 89.82, 0, 0, 190]  # guider模式的初始参数
+            ip0 = [360, 89.82, 0, 0, 180]  # guider模式的初始参数
             
         print(f"Initial fitting parameters: {ip0}")
         ifit = FitParam(ifu_xy,ifu_radec,matches,method="IFU",fixedpara=ifixedpara,
@@ -546,25 +551,46 @@ class WCSSolver:
             - CRVAL1, CRVAL2 : float, reference sky coordinates [deg]
             - CD1_1, CD1_2, CD2_1, CD2_2 : float, transformation matrix [deg/pixel]
         """
-        mi_wcs = WCS(gwcspara=gwcs_params, iwcspara=iwcs_params)
-        x0_y0_i = np.array([[iwcs_params["ICRPIX1"] - 1, iwcs_params["ICRPIX2"] - 1]])
-        ra0_i, dec0_i = mi_wcs.ifs_xy2sky(x0_y0_i)[0]  # CRVAL1/2 of IFS
+        # input:
+        lon_ifu_g = float(iwcs_params["ICRVAL1"])
+        lat_ifu_g = float(iwcs_params["ICRVAL2"])
+        # parameter:
+
+        lon_gui_p = float(gwcs_params["GCRVAL1"])
+        lat_gui_p = float(gwcs_params["GCRVAL2"])
+        lon_pole_g = float(gwcs_params["GLONPOLE"])
+        # output:
+        ra0_i, dec0_i = WCS.sphere_rotate(
+            lon_ifu_g, lat_ifu_g, lon_gui_p, lat_gui_p,
+            lon_pole_g)  # CRVAL1/2 of IFS
+        ra0_i = float(ra0_i)
+        dec0_i = float(dec0_i)
         
+        # input
+        lon_pole_g = float(gwcs_params["GLONPOLE"])  # polar longitude in Guider
+        lat_pole_g = float(gwcs_params["GCRVAL2"])  # polar latitude in Guider
+        #  parameter:
+        lon_gui_i = float(iwcs_params["ILONPOLE"])  # Guider longitude in IFS
+        lat_gui_i = float(iwcs_params["ICRVAL2"])  # Guider latitude in IFS
+        lon_ifu_g = float(iwcs_params["ICRVAL1"])  # IFS longitude in Guider
+        # output:
         # Calculate polar longitude in IFS native coordinates
-        lon_pole_m = gwcs_params["GLONPOLE"]  # polar longitude in MCI
-        lat_pole_m = gwcs_params["GCRVAL2"]  # polar latitude in MCI
-        lon_mci_i = iwcs_params["ILONPOLE"]  # MCI longitude in IFS
-        lat_mci_i = iwcs_params["ICRVAL2"]  # MCI latitude in IFS
-        lon_ifs_m = iwcs_params["ICRVAL1"]  # IFS longitude in MCI
-        
         lon_pole_i, lat_pole_i = WCS.sphere_rotate(
-            lon_pole_m, lat_pole_m, lon_mci_i, lat_mci_i,
-            lon_ifs_m)  # polar longitude in IFS
+            lon_pole_g, lat_pole_g, lon_gui_i, lat_gui_i,
+            lon_ifu_g)  # polar longitude in IFS
             
         theta = np.deg2rad(lon_pole_i - 180)  # rotation angle between IFS to sky
+
+        
+        coord = SkyCoord(ra0_i, dec0_i, unit=u.deg)
+        ra_str = coord.ra.to_string(unit=u.hourangle, sep=':', precision=2)
+        dec_str = coord.dec.to_string(unit=u.deg, sep=':', precision=2)
+        
+        print(f"IFU Position Angle: {lon_pole_i - 180}")
+        print(f"IFU Center: RA={ra_str}, DEC={dec_str}")
+        
         pixel_size_i1 = np.abs(iwcs_params["ICD1_1"])  # x spaxel length of IFS
         pixel_size_i2 = np.abs(iwcs_params["ICD2_2"])  # y spaxel length of IFS
-        
         wcspara = OrderedDict({
             "CRPIX1": iwcs_params["ICRPIX1"],
             "CRPIX2": iwcs_params["ICRPIX2"], 

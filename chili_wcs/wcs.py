@@ -159,8 +159,8 @@ class WCS():
     def pix2cpix(x, y, x0, y0):
         # Step 1
         # input x,y is column vector(array)(initial is 0)
-        u = x - (x0 - 1)
-        v = y - (y0 - 1)
+        u = x - x0 + 1
+        v = y - y0 + 1
         return u, v
 
     @staticmethod

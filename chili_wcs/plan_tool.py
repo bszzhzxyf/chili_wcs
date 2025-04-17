@@ -1,3 +1,13 @@
+
+"""
+Identifier:     chili_wcs/plan_tool.py
+Name:           plan_tool.py
+Description:    Tool for predicting WCS parameters and pointing information for CHILI guider cameras
+Author:         Yifei Xiong
+Created:        2025-04-15
+Modified-History:
+"""
+
 import numpy as np
 from collections import OrderedDict
 from astropy.coordinates import SkyCoord
@@ -60,7 +70,8 @@ class ChiliPlanTool:
         self.guiderimg_shape = (700, 934)
         self.nasmythimg_shape = (2822/4, 4144/4)
         self.ifu_shape = (710, 650)
-        self.pixel_size_guider = 9.55992827e-05
+        self.pixel_size_guider_x = 9.55992827e-05
+        self.pixel_size_guider_y = 9.57079537e-05
         self.pixel_size_nasmyth_guider = 4.32230639e-05 * 4
         self.pixel_size_ifu = 2.76923077e-05
         
@@ -105,7 +116,7 @@ class ChiliPlanTool:
         # Calculate WCS parameters for Guider and Nasmyth Guider
         self.guider_wcspara = self._calculate_wcs_params(
             self.guider_ra, self.guider_dec, self.guider_PA,
-            self.guiderimg_shape, self.pixel_size_guider
+            self.guiderimg_shape, self.pixel_size_guider_y
         )
         
         self.nasmyth_wcspara = self._calculate_wcs_params(
@@ -128,6 +139,21 @@ class ChiliPlanTool:
         
         self.nasmyth_coord = SkyCoord(ra=self.nasmyth_ra*u.deg, dec=self.nasmyth_dec*u.deg, frame='icrs')
         self.ra_dec_Nasmyth_text = f"Nasmyth Guider Center: RA={self.nasmyth_coord.ra.to_string(unit=u.hourangle, sep=':', precision=2)}, DEC={self.nasmyth_coord.dec.to_string(unit=u.deg, sep=':', precision=2)}, PA={self.nasmyth_PA:.2f}°"
+        
+        # 计算IFU到Guider的位置角
+        self.ifu_to_guider_pa = self.ifu_coord.position_angle(self.guider_coord).deg
+        
+        # 计算IFU到Nasmyth的位置角
+        self.ifu_to_nasmyth_pa = self.ifu_coord.position_angle(self.nasmyth_coord).deg
+        
+        # 计算Guider与IFU中心连线相对于Nasmyth与IFU中心连线的夹角
+        self.guider_nasmyth_angle = (self.ifu_to_nasmyth_pa - self.ifu_to_guider_pa) % 360
+        if self.guider_nasmyth_angle > 180:
+            self.guider_nasmyth_angle = 360 - self.guider_nasmyth_angle
+            
+        self.ifu_to_guider_pa_text = f"Position angle from IFU to Guider: {self.ifu_to_guider_pa:.2f}°"
+        self.ifu_to_nasmyth_pa_text = f"Position angle from IFU to Nasmyth: {self.ifu_to_nasmyth_pa:.2f}°"
+        self.guider_nasmyth_angle_text = f"Angle between Guider and Nasmyth lines: {self.guider_nasmyth_angle:.2f}°"
     def _calculate_pointing(self, ICRVAL1, ICRVAL2, ILONPOLE):
         """
         Calculate pointing and PA angle for guider camera
@@ -154,7 +180,7 @@ class ChiliPlanTool:
         # Parameter
         lon_ifu_p = self.ra_IFU
         lat_ifu_p = self.dec_IFU
-        lon_pole_i = 180 + self.PA_IFU  # Polar longitude in IFS native sky
+        lon_pole_i = 180.0 + self.PA_IFU  # Polar longitude in IFS native sky
         
         
         # Output
@@ -456,7 +482,7 @@ class ChiliPlanTool:
         # Label distance between IFU and Guider
         mid_ra1 = (self.ra_IFU + self.guider_ra) / 2
         mid_dec1 = (self.dec_IFU + self.guider_dec) / 2
-        ax.text(mid_ra1, mid_dec1, f'{self.distance_ifu_guider*60:.1f}′', color='yellow', 
+        ax.text(mid_ra1, mid_dec1, f'{self.distance_ifu_guider*3600:.1f}″', color='yellow', 
                 transform=ax.get_transform('world'), fontsize=12, 
                 bbox=dict(facecolor='black', alpha=0.5))
         
@@ -469,10 +495,17 @@ class ChiliPlanTool:
         )
         ax.add_patch(arrow2)
         
+        # 在两个箭头之间标注夹角
+        angle_ra = self.ra_IFU + 0.05 * np.cos(np.deg2rad(self.ifu_to_guider_pa + self.guider_nasmyth_angle/2))
+        angle_dec = self.dec_IFU + 0.05 * np.sin(np.deg2rad(self.ifu_to_guider_pa + self.guider_nasmyth_angle/2))
+        ax.text(angle_ra, angle_dec, f'{self.guider_nasmyth_angle:.1f}°', color='white', 
+                transform=ax.get_transform('world'), fontsize=12, 
+                bbox=dict(facecolor='black', alpha=0.5))
+        
         # Label distance between IFU and Nasmyth Guider
         mid_ra2 = (self.ra_IFU + self.nasmyth_ra) / 2
         mid_dec2 = (self.dec_IFU + self.nasmyth_dec) / 2
-        ax.text(mid_ra2, mid_dec2, f'{self.distance_ifu_nasmyth*60:.1f}′', color='magenta', 
+        ax.text(mid_ra2, mid_dec2, f'{self.distance_ifu_nasmyth*3600:.1f}″', color='magenta', 
                 transform=ax.get_transform('world'), fontsize=12, 
                 bbox=dict(facecolor='black', alpha=0.5))
         
@@ -527,6 +560,12 @@ class ChiliPlanTool:
         fig = plt.figure(figsize=(10, 10))
         ax = plt.subplot(projection=wcs)
         ax.imshow(hips, origin="lower")
+        
+        # 在图像正中心位置（CRPIX位置）绘制红色十字叉
+        crpix_x = wcs.wcs.crpix[0] - 1  # 转换为0索引
+        crpix_y = wcs.wcs.crpix[1] - 1  # 转换为0索引
+        ax.scatter(crpix_x, crpix_y, s=100, color='red', marker='+', linewidths=2)
+        
         ax.grid(color='white', ls='solid')
         ax.set_xlabel('RA', fontsize=14)
         ax.set_ylabel('DEC', fontsize=14)
